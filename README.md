@@ -81,4 +81,4 @@ Developed as a personal full-stack project using Python and Flask.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is open source and available under the [MIT License](LICENSE).
