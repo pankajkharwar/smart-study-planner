@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Planner — By Pankaj Kharwar</title>
+    
+    <!-- Instant Appearance / Theme Init Script (Prevents FOUC) -->
+    <script>
+        (function() {
+            try {
+                var saved = localStorage.getItem("studyflow_appearance_v1");
+                if (saved) {
+                    var settings = JSON.parse(saved);
+                    var root = document.documentElement;
+                    if (settings.theme) root.setAttribute("data-theme", settings.theme);
+                }
+            } catch(e) {}
+        })();
+    </script>
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Mobile Navigation Overlay Backdrop -->
+    <div class="mobile-sidebar-backdrop" id="mobile-backdrop"></div>
+
+    <div class="app-layout">
+
+        <!-- ================================================================
+             SIDEBAR NAVIGATION
+             ================================================================ -->
+        <aside class="sidebar" id="sidebar">
+            <a href="#dashboard" class="brand">
+                <span class="brand-icon">PK</span>
+                <div class="brand-text-wrap">
+                    <span class="brand-title">Study Planner</span>
+                    <span class="brand-tag">By Pankaj</span>
+                </div>
+            </a>
+
+            <p class="sidebar-label">MENU</p>
+
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-link active">
+                    <span class="nav-icon">⌂</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#study-planner" class="nav-link">
+                    <span class="nav-icon">📚</span>
+                    <span>Study Planner</span>
+                </a>
+                <a href="#add-task" class="nav-link">
+                    <span class="nav-icon">＋</span>
+                    <span>Add Task</span>
+                </a>
+                <a href="#tasks" class="nav-link">
+                    <span class="nav-icon">☑</span>
+                    <span>My Tasks</span>
+                </a>
+                <button type="button" class="nav-link btn-open-settings" style="width:100%; text-align:left; background:transparent; border:none; cursor:pointer;">
+                    <span class="nav-icon">🎨</span>
+                    <span>Theme</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-motivation" id="sidebar-motivation-card">
+                <div class="sidebar-motivation-badge">
+                    <span>💡</span> Daily Note
+                </div>
+                <p>Consistency is key. Daily practice beats last minute studying every time.</p>
+            </div>
+
+            <div class="sidebar-profile">
+                <span class="avatar-badge">
+                    {{ current_user_name[:1]|upper if current_user_name else 'P' }}
+                </span>
+                <div class="profile-meta">
+                    <span class="profile-name">
+                        {{ current_user_name if current_user_name else 'Student' }}
+                    </span>
+                    <span class="profile-sub">
+                        {% if is_admin %}Admin{% else %}Student Account{% endif %}
+                    </span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================================================================
+             MAIN DASHBOARD CONTENT
+             ================================================================ -->
+        <main class="main-content" id="dashboard">
+
+            <!-- Topbar Header -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button type="button" class="mobile-nav-toggle" aria-label="Toggle navigation menu">
+                        ☰
+                    </button>
+                    <div class="topbar-title-wrap">
+                        <p class="eyebrow">PANKAJ'S STUDY PLANNER</p>
+                        <h1>Dashboard</h1>
+                        <p class="muted">
+                            Plan subjects, schedule study hours, and track daily tasks.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="topbar-actions">
+                    <button type="button" class="btn btn-secondary btn-open-settings">
+                        <span>🎨</span> Theme
+                    </button>
+                    <a href="#add-task" class="btn btn-primary">
+                        <span>＋</span> New Task
+                    </a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" title="Sign Out">
+                        Sign Out
+                    </a>
+                </div>
+            </header>
+
+            <!-- Flash Feedback Alerts -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container">
+                        {% for category, message in messages %}
+                            <div class="flash-alert flash-{{ category }}" role="alert">
+                                <span>{{ message }}</span>
+                                <button type="button" class="flash-close-btn" aria-label="Dismiss">&times;</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- ============================================================
+                 DASHBOARD OVERVIEW METRICS CARDS
+                 ============================================================ -->
+            <section class="overview-grid" aria-label="Study metrics overview">
+                <!-- Total Tasks -->
+                <article class="overview-card card-primary" id="card-metric-total">
+                    <div class="overview-card-header">
+                        <div class="overview-icon icon-primary">▤</div>
+                        <span class="overview-badge badge-primary">Total</span>
+                    </div>
+                    <div class="overview-label">Total Tasks</div>
+                    <div class="overview-value">{{ total_tasks }}</div>
+                    <div class="overview-subtitle">Registered in your workspace</div>
+                </article>
+
+                <!-- Completed Tasks -->
+                <article class="overview-card card-success" id="card-metric-completed">
+                    <div class="overview-card-header">
+                        <div class="overview-icon icon-success">✓</div>
+                        <span class="overview-badge badge-success">{{ completion_rate }}%</span>
+                    </div>
+                    <div class="overview-label">Completed</div>
+                    <div class="overview-value">{{ completed_count }}</div>
+                    <div class="overview-subtitle">{{ pending_count }} pending tasks remain</div>
+                    <div class="overview-progress-bar">
+                        <div class="overview-progress-fill" style="width: {{ completion_rate }}%;"></div>
+                    </div>
+                </article>
+
+                <!-- Pending Study Hours -->
+                <article class="overview-card card-warning" id="card-metric-pending">
+                    <div class="overview-card-header">
+                        <div class="overview-icon icon-warning">◷</div>
+                        <span class="overview-badge badge-warning">Time</span>
+                    </div>
+                    <div class="overview-label">Pending Study Time</div>
+                    <div class="overview-value">{{ pending_hours }} <span style="font-size:16px; font-weight:600;">hrs</span></div>
+                    <div class="overview-subtitle">~{{ pending_minutes }} minutes of focus work</div>
+                </article>
+
+                <!-- Deadlines & Overdue -->
+                <article class="overview-card card-danger" id="card-metric-deadlines">
+                    <div class="overview-card-header">
+                        <div class="overview-icon icon-danger">⚡</div>
+                        {% if overdue_count > 0 %}
+                            <span class="overview-badge badge-danger">Attention Needed</span>
+                        {% else %}
+                            <span class="overview-badge badge-success">On Schedule</span>
+                        {% endif %}
+                    </div>
+                    <div class="overview-label">Deadlines Status</div>
+                    <div class="overview-value">
+                        {% if overdue_count > 0 %}
+                            {{ overdue_count }} <span style="font-size:15px; color:var(--danger); font-weight:700;">Overdue</span>
+                        {% else %}
+                            {{ due_today_count }} <span style="font-size:15px; color:var(--text-muted); font-weight:600;">Due Today</span>
+                        {% endif %}
+                    </div>
+                    <div class="overview-subtitle">{{ upcoming_count }} upcoming deadlines scheduled</div>
+                </article>
+            </section>
+
+            <!-- ============================================================
+                 WORKSPACE GRID: STUDY PLANNER & ADD TASK
+                 ============================================================ -->
+            <section class="workspace-grid">
+
+                <!-- 1. STUDY PLANNER PANEL -->
+                <article class="panel" id="study-planner">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">TIME MANAGEMENT</p>
+                            <h2>Study Planner</h2>
+                            <p class="muted">Divide daily hours across subjects based on difficulty.</p>
+                        </div>
+                        <div class="panel-icon-badge">📚</div>
+                    </div>
+
+                    <form method="POST" id="study-form">
+                        <div class="form-group">
+                            <label for="student_name">
+                                Student Name <span class="required-dot">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="student_name"
+                                name="student_name"
+                                maxlength="80"
+                                value="{{ student_name }}"
+                                placeholder="Enter your full name"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group two-col">
+                            <div>
+                                <label for="hours">
+                                    Daily Hours <span class="required-dot">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    id="hours"
+                                    name="hours"
+                                    min="0.25"
+                                    max="24"
+                                    step="0.25"
+                                    value="{{ daily_hours }}"
+                                    placeholder="e.g. 4.5"
+                                    required
+                                >
+                            </div>
+                            <div>
+                                <label for="preferred_time">
+                                    Study Slot <span class="required-dot">*</span>
+                                </label>
+                                <select id="preferred_time" name="preferred_time" required>
+                                    {% for slot in ["Morning", "Afternoon", "Evening", "Flexible"] %}
+                                        <option value="{{ slot }}" {% if preferred_time == slot %}selected{% endif %}>
+                                            {{ slot }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="subjects-section-heading">
+                            <h3>Curriculum Subjects</h3>
+                            <span class="subject-count-pill" id="subject-count">
+                                {{ subject_rows|length }} / 6
+                            </span>
+                        </div>
+
+                        <div id="subjects-container">
+                            {% for subject in subject_rows %}
+                                <div class="subject-row">
+                                    <div class="subject-row-label">Subject {{ loop.index }}</div>
+                                    <div>
+                                        <input
+                                            type="text"
+                                            name="subject_name"
+                                            maxlength="80"
+                                            value="{{ subject.name }}"
+                                            placeholder="e.g. Operating Systems"
+                                            required
+                                        >
+                                    </div>
+                                    <div>
+                                        <select name="difficulty" required>
+                                            <option value="weak" {% if subject.difficulty == "weak" %}selected{% endif %}>
+                                                Weak (High Focus)
+                                            </option>
+                                            <option value="medium" {% if subject.difficulty == "medium" %}selected{% endif %}>
+                                                Medium (Standard)
+                                            </option>
+                                            <option value="strong" {% if subject.difficulty == "strong" %}selected{% endif %}>
+                                                Strong (Revision)
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <button type="button" class="btn-remove-subject" title="Remove subject" aria-label="Remove subject">
+                                        ✕
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+                            <button type="button" id="add-subject" class="btn btn-secondary btn-full">
+                                + Add Another Subject
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-full">
+                                Generate Study Plan →
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Validation Errors -->
+                    {% if errors %}
+                        <div class="flash-alert flash-error" style="margin-top:20px; flex-direction:column; align-items:flex-start;">
+                            <strong>Please correct the following:</strong>
+                            <ul style="margin: 8px 0 0 18px; font-size:13px;">
+                                {% for error in errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <!-- Generated Study Plan Results -->
+                    {% if plan %}
+                        <div class="plan-result-card" id="plan-result">
+                            <div class="plan-result-header">
+                                <p class="eyebrow">YOUR STUDY SCHEDULE</p>
+                                <h3>Plan for {{ student_name }}</h3>
+                                <p class="muted">
+                                    Total: <strong>{{ daily_hours }} hrs/day</strong> · Preferred: <strong>{{ preferred_time }}</strong>
+                                </p>
+                            </div>
+
+                            <div class="plan-items-grid">
+                                {% for item in plan %}
+                                    <div class="plan-item-card">
+                                        <div class="plan-item-meta">
+                                            <div class="plan-item-name">
+                                                <span>{{ item.subject }}</span>
+                                                <span class="plan-item-badge {% if item.difficulty == 'Weak' %}badge-priority-high{% elif item.difficulty == 'Medium' %}badge-priority-medium{% else %}badge-priority-low{% endif %}">
+                                                    {{ item.difficulty }} Focus
+                                                </span>
+                                            </div>
+                                            <span class="plan-item-time">
+                                                {{ item.hours_per_day }} hrs <span style="font-size:11px; opacity:0.8;">({{ item.minutes_per_day }} min)</span>
+                                            </span>
+                                        </div>
+                                        <div class="plan-progress-bar">
+                                            <div class="plan-progress-fill" style="width: {{ item.percentage }}%;"></div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <!-- 2. ADD TASK PANEL -->
+                <article class="panel" id="add-task">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">TASK MANAGER</p>
+                            <h2>Add a Task</h2>
+                            <p class="muted">Add a specific topic or chapter to complete.</p>
+                        </div>
+                        <div class="panel-icon-badge">✍️</div>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('add_task') }}" id="task-form">
+                        <div class="form-group">
+                            <label for="task-student-name">
+                                Student Name <span class="required-dot">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="task-student-name"
+                                name="student_name"
+                                maxlength="80"
+                                value="{{ student_name }}"
+                                placeholder="e.g. Pankaj Kharwar"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="task-title">
+                                Task Title <span class="required-dot">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="task-title"
+                                name="title"
+                                maxlength="200"
+                                placeholder="e.g. Practice Graph Algorithms & BFS"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group two-col">
+                            <div>
+                                <label for="task-subject">
+                                    Subject <span class="required-dot">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="task-subject"
+                                    name="subject"
+                                    maxlength="80"
+                                    placeholder="e.g. Python, DBMS"
+                                    required
+                                >
+                            </div>
+                            <div>
+                                <label for="task-duration">
+                                    Duration (minutes) <span class="required-dot">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    id="task-duration"
+                                    name="duration"
+                                    min="1"
+                                    max="1440"
+                                    step="1"
+                                    placeholder="e.g. 45"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-group two-col">
+                            <div>
+                                <label for="task-time-slot">
+                                    Time Slot <span class="required-dot">*</span>
+                                </label>
+                                <select id="task-time-slot" name="time_slot" required>
+                                    <option value="Flexible">Flexible</option>
+                                    <option value="Morning">Morning</option>
+                                    <option value="Afternoon">Afternoon</option>
+                                    <option value="Evening">Evening</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="task-priority">
+                                    Priority Level <span class="required-dot">*</span>
+                                </label>
+                                <select id="task-priority" name="priority" required>
+                                    <option value="Medium" selected>Medium Priority</option>
+                                    <option value="High">High Priority 🔥</option>
+                                    <option value="Low">Low Priority</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="task-due-date">
+                                Due Date (Optional)
+                            </label>
+                            <input
+                                type="date"
+                                id="task-due-date"
+                                name="due_date"
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px;">
+                            + Save Study Task
+                        </button>
+                    </form>
+                </article>
+
+            </section>
+
+            <!-- ============================================================
+                 TASK MANAGEMENT SECTION ("MY TASKS")
+                 ============================================================ -->
+            <section class="panel task-panel" id="tasks">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">TO-DO LIST</p>
+                        <h2>My Tasks</h2>
+                        <p class="muted">Check off completed topics and track pending study tasks.</p>
+                    </div>
+                    <a href="#add-task" class="btn btn-secondary btn-sm">+ New Task</a>
+                </div>
+
+                <!-- Controls: Filter Tabs & Live Search -->
+                <div class="task-list-controls">
+                    <div class="task-filter-tabs" role="tablist">
+                        <button type="button" class="filter-tab active" data-filter="all">
+                            All <span class="filter-count-badge">{{ total_tasks }}</span>
+                        </button>
+                        <button type="button" class="filter-tab" data-filter="pending">
+                            Pending <span class="filter-count-badge">{{ pending_count }}</span>
+                        </button>
+                        <button type="button" class="filter-tab" data-filter="completed">
+                            Completed <span class="filter-count-badge">{{ completed_count }}</span>
+                        </button>
+                        {% if overdue_count > 0 %}
+                            <button type="button" class="filter-tab" data-filter="overdue">
+                                Overdue <span class="filter-count-badge" style="background:#ef4444; color:white;">{{ overdue_count }}</span>
+                            </button>
+                        {% endif %}
+                        <button type="button" class="filter-tab" data-filter="high">
+                            High Priority <span class="filter-count-badge">{{ high_priority_count }}</span>
+                        </button>
+                    </div>
+
+                    <div class="task-search-wrap">
+                        <span class="task-search-icon">🔍</span>
+                        <input
+                            type="text"
+                            id="task-search-input"
+                            class="task-search-input"
+                            placeholder="Search tasks by title or subject..."
+                        >
+                    </div>
+                </div>
+
+                <!-- Task Cards List -->
+                {% if tasks %}
+                    <div class="task-cards-list" id="task-cards-container">
+                        {% for task in tasks %}
+                            <article class="task-card {% if task.completed %}task-completed{% endif %}"
+                                     data-category="{{ task.status_category }}"
+                                     data-priority="{{ task.priority }}"
+                                     data-title="{{ task.title|e }}"
+                                     data-subject="{{ task.subject|e }}">
+                                
+                                <!-- Toggle Complete Form -->
+                                <form method="POST" action="{{ url_for('toggle_task', task_id=task.id) }}">
+                                    <button type="submit"
+                                            class="task-toggle-btn"
+                                            title="{{ 'Mark incomplete' if task.completed else 'Mark complete' }}"
+                                            aria-label="{{ 'Mark incomplete' if task.completed else 'Mark complete' }}">
+                                        ✓
+                                    </button>
+                                </form>
+
+                                <!-- Task Content Info -->
+                                <div class="task-content">
+                                    <div class="task-title-row">
+                                        <h3 class="task-title">{{ task.title }}</h3>
+                                        
+                                        <!-- Priority Badge -->
+                                        {% if task.priority == 'High' %}
+                                            <span class="badge badge-priority-high">🔥 High</span>
+                                        {% elif task.priority == 'Medium' %}
+                                            <span class="badge badge-priority-medium">Medium</span>
+                                        {% else %}
+                                            <span class="badge badge-priority-low">Low</span>
+                                        {% endif %}
+
+                                        <!-- Timeline Status Badge -->
+                                        {% if task.completed %}
+                                            <span class="badge badge-status-completed">✓ Done</span>
+                                        {% elif task.status_category == 'overdue' %}
+                                            <span class="badge badge-status-overdue">⚠ Overdue ({{ task.due_date }})</span>
+                                        {% elif task.status_category == 'due_today' %}
+                                            <span class="badge badge-status-today">⏰ Due Today</span>
+                                        {% elif task.status_category == 'upcoming' %}
+                                            <span class="badge badge-status-upcoming">📅 Due {{ task.due_date }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="task-meta-row">
+                                        <span class="task-meta-item">
+                                            <span>📚</span> <strong>{{ task.subject }}</strong>
+                                        </span>
+                                        <span class="task-meta-item">
+                                            <span>◷</span> {{ task.duration_minutes }} min
+                                        </span>
+                                        <span class="task-meta-item">
+                                            <span>☀</span> {{ task.time_slot }}
+                                        </span>
+                                        <span class="task-meta-item">
+                                            <span>👤</span> {{ task.student_name }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="task-actions">
+                                    <!-- Toggle Quick Button -->
+                                    <form method="POST" action="{{ url_for('toggle_task', task_id=task.id) }}">
+                                        <button type="submit" class="btn btn-secondary btn-sm">
+                                            {{ "Reopen" if task.completed else "Complete" }}
+                                        </button>
+                                    </form>
+
+                                    <!-- Delete Form -->
+                                    <form method="POST"
+                                          action="{{ url_for('delete_task', task_id=task.id) }}"
+                                          class="delete-task-form"
+                                          data-task-title="{{ task.title|e }}">
+                                        <button type="submit" class="btn-icon-action delete" title="Delete task" aria-label="Delete task">
+                                            🗑
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Filter Empty State (Hidden by default, shown by JS when no search match) -->
+                    <div id="empty-filtered-tasks" class="empty-state-box" style="display:none; margin-top:16px;">
+                        <div class="empty-state-icon">🔍</div>
+                        <h3>No matching tasks found</h3>
+                        <p>Try clearing your search query or switching to another filter tab.</p>
+                    </div>
+
+                {% else %}
+                    <!-- Zero Tasks Empty State -->
+                    <div class="empty-state-box">
+                        <div class="empty-state-icon">📝</div>
+                        <h3>No tasks created yet</h3>
+                        <p>Your workspace is completely clean. Generate a study plan or add your first task above to get started!</p>
+                        <a href="#add-task" class="btn btn-primary">Create Your First Task</a>
+                    </div>
+                {% endif %}
+            </section>
+
+            <!-- Page Footer -->
+            <footer class="page-footer">
+                <p><strong>Study Planner</strong> · Developed by <strong>Pankaj Kharwar</strong> 🚀</p>
+                <p>Built with Python, Flask &amp; SQLite · Personal College Project</p>
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- ====================================================================
+         APPEARANCE SETTINGS MODAL
+         ==================================================================== -->
+    <div class="modal-backdrop" id="appearance-modal" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+        <div class="settings-modal-dialog">
+            <div class="modal-header">
+                <h3 id="settings-heading">🎨 Appearance & Theme Settings</h3>
+                <button type="button" class="modal-close-btn btn-close-settings" aria-label="Close settings">&times;</button>
+            </div>
+
+            <!-- Theme Selection: Black, White, Purple -->
+            <div class="settings-section">
+                <div class="settings-section-title">Select Theme</div>
+                <div class="theme-options-grid">
+                    <button type="button" class="theme-card-option" data-theme-value="dark">
+                        <div class="theme-preview-circle theme-circle-dark"></div>
+                        <span>Black (Dark)</span>
+                    </button>
+                    <button type="button" class="theme-card-option" data-theme-value="light">
+                        <div class="theme-preview-circle theme-circle-light"></div>
+                        <span>White (Light)</span>
+                    </button>
+                    <button type="button" class="theme-card-option" data-theme-value="purple">
+                        <div class="theme-preview-circle theme-circle-purple"></div>
+                        <span>Purple</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-reset-appearance">
+                    Reset Default (Black)
+                </button>
+                <button type="button" class="btn btn-primary btn-close-settings">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         TASK DELETE CONFIRMATION MODAL
+         ==================================================================== -->
+    <div class="modal-backdrop" id="delete-task-modal" role="dialog" aria-modal="true" aria-labelledby="delete-heading">
+        <div class="settings-modal-dialog confirm-dialog">
+            <div class="confirm-dialog-icon">🗑</div>
+            <h3 id="delete-heading">Delete Task?</h3>
+            <p>
+                Are you sure you want to permanently delete <strong id="delete-modal-task-title">this task</strong>? This action cannot be undone.
+            </p>
+            <div class="confirm-dialog-actions">
+                <button type="button" class="btn btn-secondary" id="cancel-delete-btn">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">
+                    Yes, Delete Task
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Controller Script -->
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

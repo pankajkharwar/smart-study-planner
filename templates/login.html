@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Study Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .auth-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 32px 28px;
+            box-shadow: var(--shadow);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .auth-brand-icon {
+            display: inline-grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: var(--accent);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .auth-header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--heading);
+            margin-bottom: 6px;
+        }
+        .auth-header p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .auth-footer a {
+            color: var(--accent);
+            font-weight: 650;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-brand-icon">PK</div>
+                <h1>Welcome Back</h1>
+                <p>Sign in to access your study planner</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container" style="margin-bottom: 18px;">
+                        {% for category, message in messages %}
+                            <div class="flash-alert flash-{{ category }}" role="alert">
+                                <span>{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter password" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full" style="margin-top: 8px;">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Don't have an account? <a href="{{ url_for('register') }}">Create an account</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

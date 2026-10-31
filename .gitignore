@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Flask / SQLite Database (personal data - don't upload)
+instance/
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+*.env
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test scripts (optional - remove if you want to keep them)
+run_tests.py
+run_integration_tests.py
+
+# Backup folder (optional - remove if you want to keep it)
+backup_original/
+
+# IDE settings
+.vscode/
+.idea/
